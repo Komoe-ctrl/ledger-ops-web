@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap, type Provider, type TransactionStatus } from "./client";
 
 const PAGE_SIZE = 20;
@@ -28,5 +28,37 @@ export function useStats(apiKey: string | null) {
     queryKey: ["stats", apiKey],
     enabled: !!apiKey,
     queryFn: async () => unwrap(await api.GET("/v1/stats", {})),
+  });
+}
+
+export function useReconciliationExceptions(apiKey: string | null) {
+  return useQuery({
+    queryKey: ["reconciliation-exceptions", apiKey],
+    enabled: !!apiKey,
+    queryFn: async () => unwrap(await api.GET("/v1/reconciliation-exceptions", {})),
+  });
+}
+
+/** Justification obligatoire côté API aussi (400 si vide) ; l'erreur remonte telle quelle à l'écran. */
+export function useResolveException() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, resolution }: { id: string; resolution: string }) =>
+      unwrap(await api.PATCH("/v1/reconciliation-exceptions/{id}/resolve", { params: { path: { id } }, body: { resolution } })),
+    onSuccess: async () => {
+      // Les cartes du tableau de bord (exceptions ouvertes, taux) dépendent aussi de cette résolution.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["reconciliation-exceptions"] }),
+        queryClient.invalidateQueries({ queryKey: ["stats"] }),
+      ]);
+    },
+  });
+}
+
+export function useTransactionAudit(apiKey: string | null, reference: string) {
+  return useQuery({
+    queryKey: ["transaction-audit", apiKey, reference],
+    enabled: !!apiKey,
+    queryFn: async () => unwrap(await api.GET("/v1/transactions/{reference}/audit", { params: { path: { reference } } })),
   });
 }

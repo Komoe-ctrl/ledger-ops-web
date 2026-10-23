@@ -11,7 +11,8 @@ export type ProblemDetails = components["schemas"]["ProblemDetailsDto"];
 const withApiKey: Middleware = {
   onRequest({ request }) {
     const key = getApiKey();
-    if (key) request.headers.set("Authorization", `Bearer ${key}`);
+    // Un en-tête explicite (validation d'une clé avant de l'adopter) prime sur la clé enregistrée.
+    if (key && !request.headers.has("Authorization")) request.headers.set("Authorization", `Bearer ${key}`);
     return request;
   },
 };

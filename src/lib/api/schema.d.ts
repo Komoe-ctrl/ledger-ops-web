@@ -171,6 +171,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/transactions/{reference}/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Audit d'une transaction : chronologie des statuts, remboursements et écritures comptables
+         * @description Chronologie fusionnée de la transaction et de ses remboursements (litige compris), puis écritures comptables avec totaux et équilibre calculés en SQL. Les écritures ne sont pas exposées à un MERCHANT (entries = null).
+         */
+        get: operations["TransactionsController_getAudit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/transactions/{reference}/status": {
         parameters: {
             query?: never;
@@ -406,6 +426,85 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        /** @enum {string} */
+        TransactionStatus: "INITIATED" | "PENDING" | "SUCCEEDED" | "FAILED" | "EXPIRED" | "PARTIALLY_REFUNDED" | "REFUNDED" | "DISPUTED" | "REVERSED";
+        AuditRefundDto: {
+            reference: string;
+            status: components["schemas"]["TransactionStatus"];
+            /** @example 4000 */
+            amount: string;
+            /** @example XOF */
+            currency: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @enum {string} */
+        TransactionType: "PAYMENT" | "REFUND";
+        /** @enum {string} */
+        ActorType: "USER" | "SYSTEM" | "PROVIDER";
+        AuditTimelineEventDto: {
+            /** @description Transaction concernée : la transaction elle-même ou l'un de ses remboursements. */
+            transactionReference: string;
+            transactionType: components["schemas"]["TransactionType"];
+            fromStatus: components["schemas"]["TransactionStatus"] | null;
+            toStatus: components["schemas"]["TransactionStatus"];
+            actorType: components["schemas"]["ActorType"];
+            actorId: string | null;
+            /** @description Motif du changement, quand il existe. */
+            reason: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @enum {string} */
+        EntryDirection: "DEBIT" | "CREDIT";
+        AuditPostingDto: {
+            /** @example provider:wave:clearing */
+            accountCode: string;
+            /** @example Créance Wave */
+            accountName: string;
+            direction: components["schemas"]["EntryDirection"];
+            /**
+             * @description Unité mineure, en chaîne (ADR 0002).
+             * @example 10000
+             */
+            amount: string;
+            /** @example XOF */
+            currency: string;
+        };
+        AuditJournalEntryDto: {
+            id: string;
+            /** @example Paiement réussi TXN-20260922-8F3K2Q */
+            description: string;
+            /** @description Transaction à laquelle l'écriture est rattachée (elle-même ou un remboursement). */
+            transactionReference: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** @description Débits d'abord, puis crédits. */
+            postings: components["schemas"]["AuditPostingDto"][];
+            /**
+             * @description Somme des débits, calculée par PostgreSQL.
+             * @example 10000
+             */
+            totalDebit: string;
+            /**
+             * @description Somme des crédits, calculée par PostgreSQL.
+             * @example 10000
+             */
+            totalCredit: string;
+            /** @description totalDebit = totalCredit, évalué par PostgreSQL (partie double, ADR 0001). */
+            balanced: boolean;
+        };
+        TransactionAuditResponseDto: {
+            transaction: components["schemas"]["TransactionResponseDto"];
+            /** @description Pour un remboursement : le paiement remboursé. */
+            parentReference: string | null;
+            /** @description Remboursements de ce paiement (vide pour un remboursement). */
+            refunds: components["schemas"]["AuditRefundDto"][];
+            /** @description Changements de statut de la transaction et de ses remboursements, du plus ancien au plus récent (litige compris : DISPUTED, REVERSED). */
+            timeline: components["schemas"]["AuditTimelineEventDto"][];
+            /** @description Écritures comptables de la transaction et de ses remboursements. null pour un MERCHANT : le plan comptable interne n'est pas exposé aux marchands. */
+            entries: components["schemas"]["AuditJournalEntryDto"][] | null;
+        };
         TransitionStatusDto: {
             /** @enum {string} */
             status: "INITIATED" | "PENDING" | "SUCCEEDED" | "FAILED" | "EXPIRED" | "PARTIALLY_REFUNDED" | "REFUNDED" | "DISPUTED" | "REVERSED";
@@ -432,14 +531,14 @@ export interface components {
             detectedAt: string;
             resolvedAt: Record<string, never> | null;
             resolvedBy: Record<string, never> | null;
+            /** @description Libellé de la clé API qui a résolu l'exception (resolvedBy est son identifiant). null si non résolue ou clé introuvable. */
+            resolvedByLabel: string | null;
             resolution: Record<string, never> | null;
         };
         ResolveReconciliationExceptionDto: {
             /** @example Confirmé côté opérateur (rapport OM du 24/09), booké manuellement en correction. */
             resolution: string;
         };
-        /** @enum {string} */
-        TransactionStatus: "INITIATED" | "PENDING" | "SUCCEEDED" | "FAILED" | "EXPIRED" | "PARTIALLY_REFUNDED" | "REFUNDED" | "DISPUTED" | "REVERSED";
         StatusCountDto: {
             status: components["schemas"]["TransactionStatus"];
             /** @example 42 */
@@ -759,6 +858,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TransactionHistoryEntryDto"][];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetailsDto"];
+                };
+            };
+        };
+    };
+    TransactionsController_getAudit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reference: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransactionAuditResponseDto"];
                 };
             };
             404: {
