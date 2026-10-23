@@ -3,7 +3,7 @@ import { api, unwrap, type Provider, type TransactionStatus } from "./client";
 
 const PAGE_SIZE = 20;
 
-// nextCursor est typé `object` par le contrat (le décorateur Swagger ne précise pas le type) ;
+// TEMPORAIRE (issue API #36, voir asText dans lib/format.ts) : nextCursor est typé `object` par le contrat ;
 // c'est une chaîne opaque à renvoyer telle quelle.
 const asCursor = (c: unknown): string | undefined => (typeof c === "string" ? c : undefined);
 

@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ErrorNotice } from "@/components/error-notice";
+import { Intro } from "@/components/intro";
+import { StatusBadge } from "@/components/status-badge";
 import { type Provider, type TransactionStatus } from "@/lib/api/client";
 import { useStats, useTransactions } from "@/lib/api/queries";
 import { useApiKey } from "@/lib/api/use-api-key";
@@ -78,10 +79,12 @@ export function Dashboard() {
         </p>
       </header>
 
+      <Intro />
+
       {!apiKey ? (
         <Alert>
           <AlertTitle>Saisissez une clé API</AlertTitle>
-          <AlertDescription>Collez une clé ou utilisez l&apos;un des boutons de clé de démonstration.</AlertDescription>
+          <AlertDescription>Utilisez la clé démo ANALYST pour la démonstration complète (ou MERCHANT pour la vue marchand), ou collez une clé.</AlertDescription>
         </Alert>
       ) : (
         <>
@@ -196,7 +199,7 @@ export function Dashboard() {
                         <TableCell>{t.type === "PAYMENT" ? "Paiement" : "Remboursement"}</TableCell>
                         <TableCell>{PROVIDER_LABELS[t.provider]}</TableCell>
                         <TableCell>
-                          <Badge variant="secondary">{STATUS_LABELS[t.status]}</Badge>
+                          <StatusBadge status={t.status} />
                         </TableCell>
                         <TableCell className="text-right tabular-nums">{formatAmount(t.amount, t.currency)}</TableCell>
                         <TableCell className="tabular-nums">{formatDateTime(t.createdAt)}</TableCell>

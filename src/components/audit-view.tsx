@@ -8,11 +8,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ErrorNotice } from "@/components/error-notice";
+import { StatusBadge } from "@/components/status-badge";
 import { useTransactionAudit } from "@/lib/api/queries";
 import { useApiKey } from "@/lib/api/use-api-key";
-import { ACTOR_LABELS, formatAmount, formatDateTime, PROVIDER_LABELS, STATUS_LABELS } from "@/lib/format";
+import { ACTOR_LABELS, formatAmount, formatDateTime, PROVIDER_LABELS } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 const DISPUTE_STATUSES = ["DISPUTED", "REVERSED"];
+
+// Teintes des deux côtés de la partie double. Les libellés « Débit » / « Crédit » sont toujours
+// écrits : la couleur aide à lire les colonnes, elle ne porte pas l'information seule.
+const DEBIT_TINT = "bg-sky-50 dark:bg-sky-950/30";
+const CREDIT_TINT = "bg-violet-50 dark:bg-violet-950/30";
 
 function ReferenceLink({ reference }: { reference: string }) {
   return (
@@ -54,10 +61,55 @@ export function AuditView({ params }: { params: Promise<{ reference: string }> }
 }
 
 type Audit = NonNullable<ReturnType<typeof useTransactionAudit>["data"]>;
+type Entry = NonNullable<Audit["entries"]>[number];
+
+/**
+ * L'image qui résume le projet : total des débits = total des crédits, face à face.
+ * Les deux totaux ET le verdict (`balanced`) viennent de PostgreSQL ; rien n'est additionné ici.
+ */
+function BalanceStrip({ entry, currency }: { entry: Entry; currency: string }) {
+  const ok = entry.balanced;
+  const side = (label: string, amount: string, tint: string, align: "start" | "end") => (
+    <div className={cn("flex flex-col justify-center rounded-lg px-4 py-3", tint, align === "end" ? "items-end text-right" : "items-start")}>
+      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="text-2xl font-semibold tabular-nums">{formatAmount(amount, currency)}</span>
+    </div>
+  );
+
+  return (
+    <div
+      role="group"
+      aria-label={ok ? "Écriture équilibrée : débits égaux aux crédits" : "Écriture déséquilibrée : débits différents des crédits"}
+      className={cn(
+        "grid grid-cols-[1fr_auto_1fr] items-stretch gap-3 rounded-xl border-2 p-3",
+        ok ? "border-emerald-500/70" : "border-red-500 bg-red-50 dark:bg-red-950/30",
+      )}
+    >
+      {side("Total des débits", entry.totalDebit, DEBIT_TINT, "start")}
+      <div className="flex min-w-24 flex-col items-center justify-center">
+        <span
+          className={cn(
+            "flex size-11 items-center justify-center rounded-full text-3xl font-light leading-none text-white",
+            ok ? "bg-emerald-600" : "bg-red-600",
+          )}
+          aria-hidden
+        >
+          {ok ? "=" : "≠"}
+        </span>
+        <span className={cn("mt-1 text-xs font-semibold", ok ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400")}>
+          {ok ? "Équilibrée" : "Déséquilibrée"}
+        </span>
+      </div>
+      {side("Total des crédits", entry.totalCredit, CREDIT_TINT, "end")}
+    </div>
+  );
+}
 
 function AuditContent({ audit, reference }: { audit: Audit; reference: string }) {
   const { transaction } = audit;
   const currency = transaction.currency;
+  const entryCount = audit.entries?.length ?? 0;
+  const allBalanced = audit.entries?.every((e) => e.balanced) ?? false;
 
   return (
     <>
@@ -71,11 +123,11 @@ function AuditContent({ audit, reference }: { audit: Audit; reference: string })
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Statut</p>
-            <Badge variant="secondary">{STATUS_LABELS[transaction.status]}</Badge>
+            <StatusBadge status={transaction.status} />
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Montant</p>
-            <p className="tabular-nums">{formatAmount(transaction.amount, currency)}</p>
+            <p className="text-lg font-semibold tabular-nums">{formatAmount(transaction.amount, currency)}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">{audit.parentReference ? "Paiement remboursé" : "Déjà remboursé"}</p>
@@ -104,20 +156,23 @@ function AuditContent({ audit, reference }: { audit: Audit; reference: string })
                     <time className="text-sm tabular-nums text-muted-foreground" dateTime={event.createdAt}>
                       {formatDateTime(event.createdAt)}
                     </time>
-                    {event.fromStatus ? (
-                      <span className="flex items-center gap-1 text-sm">
-                        <Badge variant="outline">{STATUS_LABELS[event.fromStatus]}</Badge>→
-                        <Badge variant="secondary">{STATUS_LABELS[event.toStatus]}</Badge>
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-sm">
-                        Création<Badge variant="secondary">{STATUS_LABELS[event.toStatus]}</Badge>
-                      </span>
-                    )}
-                    {dispute && <Badge variant="destructive">Litige</Badge>}
+                    <span className="flex items-center gap-1.5 text-sm">
+                      {event.fromStatus ? (
+                        <>
+                          <StatusBadge status={event.fromStatus} className="opacity-70" />
+                          <span aria-hidden>→</span>
+                          <span className="sr-only">vers</span>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">Création</span>
+                      )}
+                      <StatusBadge status={event.toStatus} />
+                    </span>
+                    {dispute && <Badge variant="destructive">{event.toStatus === "REVERSED" ? "Litige perdu" : "Litige ouvert"}</Badge>}
                     {other && (
                       <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        {event.transactionType === "REFUND" ? "Remboursement" : "Transaction liée"} <ReferenceLink reference={event.transactionReference} />
+                        {event.transactionType === "REFUND" ? "Remboursement" : "Transaction liée"}{" "}
+                        <ReferenceLink reference={event.transactionReference} />
                       </span>
                     )}
                   </div>
@@ -145,12 +200,23 @@ function AuditContent({ audit, reference }: { audit: Audit; reference: string })
       </Card>
 
       <section className="flex flex-col gap-4" aria-label="Écritures comptables">
-        <h2 className="text-lg font-semibold">Écritures comptables</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold">Écritures comptables</h2>
+          {audit.entries !== null && entryCount > 0 && (
+            <Badge variant={allBalanced ? "secondary" : "destructive"}>
+              {allBalanced
+                ? `${entryCount} écriture${entryCount > 1 ? "s" : ""} · toutes équilibrées`
+                : "Au moins une écriture déséquilibrée"}
+            </Badge>
+          )}
+        </div>
+
         {audit.entries === null ? (
           <Alert>
-            <AlertTitle>Écritures réservées</AlertTitle>
+            <AlertTitle>Détail comptable non exposé</AlertTitle>
             <AlertDescription>
-              Le plan comptable interne n&apos;est visible que des rôles ANALYST, OPERATOR et ADMIN.
+              Le détail comptable interne n&apos;est pas exposé aux marchands : comptes de compensation, commissions et contre-écritures
+              relèvent de la plateforme. Utilisez la clé ANALYST pour voir les écritures et leur équilibre.
             </AlertDescription>
           </Alert>
         ) : audit.entries.length === 0 ? (
@@ -159,10 +225,11 @@ function AuditContent({ audit, reference }: { audit: Audit; reference: string })
             <AlertDescription>Aucune écriture comptable n&apos;est posée tant que la transaction n&apos;a pas abouti.</AlertDescription>
           </Alert>
         ) : (
-          audit.entries.map((entry) => (
-            <Card key={entry.id} size="sm">
-              <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
-                <div>
+          audit.entries.map((entry) => {
+            const entryCurrency = entry.postings[0]?.currency ?? currency;
+            return (
+              <Card key={entry.id}>
+                <CardHeader>
                   <CardTitle>{entry.description}</CardTitle>
                   <p className="text-xs text-muted-foreground">
                     <span className="tabular-nums">{formatDateTime(entry.createdAt)}</span>
@@ -173,48 +240,48 @@ function AuditContent({ audit, reference }: { audit: Audit; reference: string })
                       </>
                     )}
                   </p>
-                </div>
-                {entry.balanced ? (
-                  <Badge variant="secondary">Équilibrée · débits = crédits</Badge>
-                ) : (
-                  <Badge variant="destructive">Déséquilibrée · débits ≠ crédits</Badge>
-                )}
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Compte</TableHead>
-                      <TableHead className="text-right">Débit</TableHead>
-                      <TableHead className="text-right">Crédit</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {entry.postings.map((p, i) => (
-                      <TableRow key={i}>
-                        <TableCell>
-                          {p.accountName} <span className="font-mono text-xs text-muted-foreground">{p.accountCode}</span>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  <BalanceStrip entry={entry} currency={entryCurrency} />
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Compte</TableHead>
+                        <TableHead className={cn("w-48 text-right", DEBIT_TINT)}>Débit</TableHead>
+                        <TableHead className={cn("w-48 text-right", CREDIT_TINT)}>Crédit</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {entry.postings.map((p, i) => (
+                        <TableRow key={i}>
+                          <TableCell>
+                            {p.accountName} <span className="font-mono text-xs text-muted-foreground">{p.accountCode}</span>
+                          </TableCell>
+                          <TableCell className={cn("text-right tabular-nums", DEBIT_TINT)}>
+                            {p.direction === "DEBIT" ? formatAmount(p.amount, p.currency) : ""}
+                          </TableCell>
+                          <TableCell className={cn("text-right tabular-nums", CREDIT_TINT)}>
+                            {p.direction === "CREDIT" ? formatAmount(p.amount, p.currency) : ""}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                    <TableFooter>
+                      <TableRow>
+                        <TableCell className="font-semibold">Totaux</TableCell>
+                        <TableCell className={cn("text-right font-semibold tabular-nums", DEBIT_TINT)}>
+                          {formatAmount(entry.totalDebit, entryCurrency)}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {p.direction === "DEBIT" ? formatAmount(p.amount, p.currency) : ""}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {p.direction === "CREDIT" ? formatAmount(p.amount, p.currency) : ""}
+                        <TableCell className={cn("text-right font-semibold tabular-nums", CREDIT_TINT)}>
+                          {formatAmount(entry.totalCredit, entryCurrency)}
                         </TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                  <TableFooter>
-                    <TableRow>
-                      <TableCell className="font-medium">Totaux</TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">{formatAmount(entry.totalDebit, currency)}</TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">{formatAmount(entry.totalCredit, currency)}</TableCell>
-                    </TableRow>
-                  </TableFooter>
-                </Table>
-              </CardContent>
-            </Card>
-          ))
+                    </TableFooter>
+                  </Table>
+                </CardContent>
+              </Card>
+            );
+          })
         )}
       </section>
     </>
