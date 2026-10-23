@@ -88,6 +88,14 @@ function ResolveForm({ exception, onDone }: { exception: ReconciliationException
   );
 }
 
+function ResolveToggle({ expanded, onClick }: { expanded: boolean; onClick: () => void }) {
+  return (
+    <Button size="sm" variant="outline" aria-expanded={expanded} onClick={onClick}>
+      Résoudre
+    </Button>
+  );
+}
+
 export function ReconciliationView() {
   const apiKey = useApiKey();
   const exceptions = useReconciliationExceptions(apiKey);
@@ -145,33 +153,36 @@ export function ReconciliationView() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Type</TableHead>
-                    <TableHead>Transaction</TableHead>
+                    <TableHead className="hidden md:table-cell">Transaction</TableHead>
                     <TableHead>Constat</TableHead>
-                    <TableHead>Détectée le</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
+                    <TableHead className="hidden md:table-cell">Détectée le</TableHead>
+                    <TableHead className="hidden text-right md:table-cell">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {open.map((e) => (
                     <Fragment key={e.id}>
                       <TableRow>
-                        <TableCell>
+                        <TableCell className="whitespace-normal">
                           <Badge variant="secondary">{EXCEPTION_KIND_LABELS[e.kind]}</Badge>
+                          {/* Mobile : la transaction passe sous le type, sa colonne est masquée. */}
+                          <div className="mt-1 break-all md:hidden">
+                            <TransactionCell exception={e} />
+                          </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden md:table-cell">
                           <TransactionCell exception={e} />
                         </TableCell>
-                        <TableCell className="max-w-sm whitespace-normal">{describe(e)}</TableCell>
-                        <TableCell className="tabular-nums">{formatDateTime(e.detectedAt)}</TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            aria-expanded={resolvingId === e.id}
-                            onClick={() => setResolvingId(resolvingId === e.id ? null : e.id)}
-                          >
-                            Résoudre
-                          </Button>
+                        <TableCell className="max-w-sm whitespace-normal">
+                          {describe(e)}
+                          {/* Mobile : le bouton passe sous le constat, sa colonne est masquée. */}
+                          <div className="mt-2 md:hidden">
+                            <ResolveToggle expanded={resolvingId === e.id} onClick={() => setResolvingId(resolvingId === e.id ? null : e.id)} />
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden tabular-nums md:table-cell">{formatDateTime(e.detectedAt)}</TableCell>
+                        <TableCell className="hidden text-right md:table-cell">
+                          <ResolveToggle expanded={resolvingId === e.id} onClick={() => setResolvingId(resolvingId === e.id ? null : e.id)} />
                         </TableCell>
                       </TableRow>
                       {resolvingId === e.id && (
@@ -197,27 +208,37 @@ export function ReconciliationView() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Type</TableHead>
-                    <TableHead>Transaction</TableHead>
+                    <TableHead className="hidden md:table-cell">Transaction</TableHead>
                     <TableHead>Justification</TableHead>
-                    <TableHead>Résolue par</TableHead>
-                    <TableHead>Résolue le</TableHead>
+                    <TableHead className="hidden md:table-cell">Résolue par</TableHead>
+                    <TableHead className="hidden md:table-cell">Résolue le</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {resolved.map((e) => {
                     const resolvedAt = asText(e.resolvedAt);
+                    // Libellé de la clé uniquement : jamais l'identifiant (resolvedBy) de la clé.
+                    const resolver = e.resolvedByLabel ?? "Clé inconnue";
                     return (
                       <TableRow key={e.id}>
-                        <TableCell>
+                        <TableCell className="whitespace-normal">
                           <Badge variant="secondary">{EXCEPTION_KIND_LABELS[e.kind]}</Badge>
+                          <div className="mt-1 break-all md:hidden">
+                            <TransactionCell exception={e} />
+                          </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden md:table-cell">
                           <TransactionCell exception={e} />
                         </TableCell>
-                        <TableCell className="max-w-sm whitespace-normal">{asText(e.resolution) ?? "—"}</TableCell>
-                        {/* Libellé de la clé uniquement : jamais l'identifiant (resolvedBy) de la clé. */}
-                        <TableCell>{e.resolvedByLabel ?? "Clé inconnue"}</TableCell>
-                        <TableCell className="tabular-nums">{resolvedAt ? formatDateTime(resolvedAt) : "—"}</TableCell>
+                        <TableCell className="max-w-sm whitespace-normal">
+                          {asText(e.resolution) ?? "—"}
+                          {/* Mobile : qui et quand passent sous la justification. */}
+                          <p className="mt-1 text-xs text-muted-foreground md:hidden">
+                            {resolver} · <span className="tabular-nums">{resolvedAt ? formatDateTime(resolvedAt) : "—"}</span>
+                          </p>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">{resolver}</TableCell>
+                        <TableCell className="hidden tabular-nums md:table-cell">{resolvedAt ? formatDateTime(resolvedAt) : "—"}</TableCell>
                       </TableRow>
                     );
                   })}
