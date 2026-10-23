@@ -215,7 +215,8 @@ export function ReconciliationView() {
                           <TransactionCell exception={e} />
                         </TableCell>
                         <TableCell className="max-w-sm whitespace-normal">{asText(e.resolution) ?? "—"}</TableCell>
-                        <TableCell>{e.resolvedByLabel ?? asText(e.resolvedBy) ?? "—"}</TableCell>
+                        {/* Libellé de la clé uniquement : jamais l'identifiant (resolvedBy) de la clé. */}
+                        <TableCell>{e.resolvedByLabel ?? "Clé inconnue"}</TableCell>
                         <TableCell className="tabular-nums">{resolvedAt ? formatDateTime(resolvedAt) : "—"}</TableCell>
                       </TableRow>
                     );
