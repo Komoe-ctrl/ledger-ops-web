@@ -27,3 +27,29 @@ export const PROVIDER_LABELS: Record<string, string> = {
   WAVE: "Wave",
   MOOV_MONEY: "Moov Money",
 };
+
+export const EXCEPTION_KIND_LABELS: Record<string, string> = {
+  LATE_ACKNOWLEDGMENT: "Acquittement tardif",
+  MISSING_IN_STATEMENT: "Absente du relevé",
+  MISSING_LOCALLY: "Absente chez nous",
+  AMOUNT_MISMATCH: "Écart de montant",
+};
+
+export const ACTOR_LABELS: Record<string, string> = {
+  USER: "Utilisateur",
+  SYSTEM: "Système",
+  PROVIDER: "Opérateur",
+};
+
+export const DIRECTION_LABELS: Record<string, string> = {
+  DEBIT: "Débit",
+  CREDIT: "Crédit",
+};
+
+/**
+ * Le contrat OpenAPI type certains champs nullables en `object` (voir issue API #36) :
+ * on ne garde que les chaînes, sans rien supposer d'autre.
+ */
+export function asText(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}

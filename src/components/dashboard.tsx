@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -7,31 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ApiKeyPanel, useApiKey } from "@/components/api-key-panel";
-import { ApiError, type Provider, type TransactionStatus } from "@/lib/api/client";
+import { ErrorNotice } from "@/components/error-notice";
+import { type Provider, type TransactionStatus } from "@/lib/api/client";
 import { useStats, useTransactions } from "@/lib/api/queries";
+import { useApiKey } from "@/lib/api/use-api-key";
 import { formatAmount, formatDateTime, PROVIDER_LABELS, STATUS_LABELS } from "@/lib/format";
 
 const selectClass =
   "h-8 rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
-
-function ErrorNotice({ error, what }: { error: unknown; what: string }) {
-  const status = error instanceof ApiError ? error.status : undefined;
-  const message =
-    status === 401
-      ? "Clé API absente, invalide ou révoquée."
-      : status === 403
-        ? `Votre rôle n'a pas accès à ${what}.`
-        : error instanceof ApiError
-          ? error.message
-          : "API injoignable. Vérifiez qu'elle tourne et que CORS l'autorise.";
-  return (
-    <Alert variant={status === 403 ? "default" : "destructive"}>
-      <AlertTitle>{status ? `Erreur ${status}` : "Erreur réseau"}</AlertTitle>
-      <AlertDescription>{message}</AlertDescription>
-    </Alert>
-  );
-}
 
 function Kpi({ title, value, hint, loading }: { title: string; value: string; hint?: string; loading?: boolean }) {
   return (
@@ -43,7 +28,9 @@ function Kpi({ title, value, hint, loading }: { title: string; value: string; hi
         {loading ? (
           <Skeleton className="h-8 w-24" />
         ) : (
-          <div className={`text-2xl font-semibold ${value === "Indisponible" || value === "Réservé" ? "text-muted-foreground" : ""}`}>
+          <div
+            className={`text-2xl font-semibold tabular-nums ${value === "Indisponible" || value === "Réservé" ? "text-muted-foreground" : ""}`}
+          >
             {value}
           </div>
         )}
@@ -71,6 +58,7 @@ function reconciliationRate(rec: { settledTransactions: number; reconciledTransa
 }
 
 export function Dashboard() {
+  const router = useRouter();
   const apiKey = useApiKey();
   const [status, setStatus] = useState<TransactionStatus | "">("");
   const [provider, setProvider] = useState<Provider | "">("");
@@ -81,16 +69,13 @@ export function Dashboard() {
   const rows = list.data?.pages.flatMap((p) => p.data) ?? [];
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6">
-      <header className="flex flex-col gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">ledger-ops — démonstration</h1>
-          <p className="text-sm text-muted-foreground">
-            {stats.data?.demoDatasetLoadedAt
-              ? `Jeu de démonstration chargé le ${formatDateTime(stats.data.demoDatasetLoadedAt)}`
-              : "Jeu de démonstration : date de chargement indisponible"}
-          </p>
-        </div>
-        <ApiKeyPanel />
+      <header>
+        <h1 className="text-2xl font-semibold">Tableau de bord</h1>
+        <p className="text-sm text-muted-foreground">
+          {stats.data?.demoDatasetLoadedAt
+            ? `Jeu de démonstration chargé le ${formatDateTime(stats.data.demoDatasetLoadedAt)}`
+            : "Jeu de démonstration : date de chargement indisponible"}
+        </p>
       </header>
 
       {!apiKey ? (
@@ -193,15 +178,28 @@ export function Dashboard() {
                         </TableRow>
                       ))}
                     {rows.map((t) => (
-                      <TableRow key={t.reference}>
-                        <TableCell className="font-mono text-xs">{t.reference}</TableCell>
+                      <TableRow
+                        key={t.reference}
+                        className="cursor-pointer"
+                        onClick={() => router.push(`/transactions/${encodeURIComponent(t.reference)}`)}
+                      >
+                        <TableCell className="font-mono text-xs">
+                          {/* Vrai lien : accessible au clavier et ouvrable dans un nouvel onglet. */}
+                          <Link
+                            href={`/transactions/${encodeURIComponent(t.reference)}`}
+                            className="underline-offset-4 hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {t.reference}
+                          </Link>
+                        </TableCell>
                         <TableCell>{t.type === "PAYMENT" ? "Paiement" : "Remboursement"}</TableCell>
                         <TableCell>{PROVIDER_LABELS[t.provider]}</TableCell>
                         <TableCell>
                           <Badge variant="secondary">{STATUS_LABELS[t.status]}</Badge>
                         </TableCell>
                         <TableCell className="text-right tabular-nums">{formatAmount(t.amount, t.currency)}</TableCell>
-                        <TableCell>{formatDateTime(t.createdAt)}</TableCell>
+                        <TableCell className="tabular-nums">{formatDateTime(t.createdAt)}</TableCell>
                       </TableRow>
                     ))}
                     {list.isSuccess && rows.length === 0 && (
