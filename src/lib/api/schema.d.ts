@@ -245,6 +245,26 @@ export interface paths {
         patch: operations["ReconciliationController_resolve"];
         trace?: never;
     };
+    "/v1/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Agrégats pour tableau de bord (comptages calculés en SQL)
+         * @description Volume, répartition par statut, exceptions de rapprochement ouvertes et date de chargement du jeu de démonstration. Portée MERCHANT : uniquement les transactions du marchand de la clé.
+         */
+        get: operations["StatsController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -417,6 +437,42 @@ export interface components {
         ResolveReconciliationExceptionDto: {
             /** @example Confirmé côté opérateur (rapport OM du 24/09), booké manuellement en correction. */
             resolution: string;
+        };
+        /** @enum {string} */
+        TransactionStatus: "INITIATED" | "PENDING" | "SUCCEEDED" | "FAILED" | "EXPIRED" | "PARTIALLY_REFUNDED" | "REFUNDED" | "DISPUTED" | "REVERSED";
+        StatusCountDto: {
+            status: components["schemas"]["TransactionStatus"];
+            /** @example 42 */
+            count: number;
+        };
+        PaymentStatsDto: {
+            /** @example 70 */
+            total: number;
+            /** @description Paiements seulement (hors remboursements) ; tous les statuts sont présents, à 0 si vide. */
+            byStatus: components["schemas"]["StatusCountDto"][];
+        };
+        StatsResponseDto: {
+            /**
+             * @description GLOBAL : toute la plateforme. MERCHANT : uniquement les transactions du marchand de la clé.
+             * @enum {string}
+             */
+            scope: "GLOBAL" | "MERCHANT";
+            /**
+             * @description Nombre de transactions (paiements et remboursements).
+             * @example 72
+             */
+            totalTransactions: number;
+            /** @description Répartition de toutes les transactions par statut ; tous les statuts sont présents, à 0 si vide. */
+            byStatus: components["schemas"]["StatusCountDto"][];
+            /** @description Mêmes comptages, restreints aux paiements (base du taux de réussite). */
+            payments: components["schemas"]["PaymentStatsDto"];
+            /** @description Exceptions de rapprochement non résolues. null pour un MERCHANT : le rapprochement est réservé aux rôles ANALYST/OPERATOR/ADMIN. */
+            openReconciliationExceptions: number | null;
+            /**
+             * Format: date-time
+             * @description Dernier chargement enregistré du jeu de démonstration (registre demo_dataset_loads). null si jamais chargé.
+             */
+            demoDatasetLoadedAt: string | null;
         };
     };
     responses: never;
@@ -793,6 +849,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReconciliationExceptionResponseDto"];
+                };
+            };
+        };
+    };
+    StatsController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatsResponseDto"];
                 };
             };
         };
