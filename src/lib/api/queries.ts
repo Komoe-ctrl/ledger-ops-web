@@ -1,4 +1,4 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { api, unwrap, type Provider, type TransactionStatus } from "./client";
 
 const PAGE_SIZE = 20;
@@ -19,5 +19,14 @@ export function useTransactions(apiKey: string | null, filters: { status?: Trans
         }),
       ),
     getNextPageParam: (last) => asCursor(last.nextCursor),
+  });
+}
+
+/** Agrégats calculés en SQL côté API, scopés par rôle : aucune pagination côté navigateur. */
+export function useStats(apiKey: string | null) {
+  return useQuery({
+    queryKey: ["stats", apiKey],
+    enabled: !!apiKey,
+    queryFn: async () => unwrap(await api.GET("/v1/stats", {})),
   });
 }

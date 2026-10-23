@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ApiKeyPanel, useApiKey } from "@/components/api-key-panel";
 import { ApiError, type Provider, type TransactionStatus } from "@/lib/api/client";
-import { useTransactions } from "@/lib/api/queries";
+import { useStats, useTransactions } from "@/lib/api/queries";
 import { formatAmount, formatDateTime, PROVIDER_LABELS, STATUS_LABELS } from "@/lib/format";
 
 const selectClass =
@@ -33,18 +33,36 @@ function ErrorNotice({ error, what }: { error: unknown; what: string }) {
   );
 }
 
-function Kpi({ title, value, hint }: { title: string; value: string; hint?: string }) {
+function Kpi({ title, value, hint, loading }: { title: string; value: string; hint?: string; loading?: boolean }) {
   return (
     <Card size="sm">
       <CardHeader>
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-semibold text-muted-foreground">{value}</div>
+        {loading ? (
+          <Skeleton className="h-8 w-24" />
+        ) : (
+          <div className={`text-2xl font-semibold ${value === "Indisponible" || value === "Réservé" ? "text-muted-foreground" : ""}`}>
+            {value}
+          </div>
+        )}
         {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
       </CardContent>
     </Card>
   );
+}
+
+const IN_PROGRESS = ["INITIATED", "PENDING"];
+const NOT_SUCCEEDED = ["FAILED", "EXPIRED"];
+
+// Rapport de deux comptages entiers fournis par l'API (jamais de montants).
+function successRate(byStatus: { status: string; count: number }[]): string {
+  const settled = byStatus.filter((c) => !IN_PROGRESS.includes(c.status));
+  const total = settled.reduce((acc, c) => acc + c.count, 0);
+  if (total === 0) return "—";
+  const failed = settled.filter((c) => NOT_SUCCEEDED.includes(c.status)).reduce((acc, c) => acc + c.count, 0);
+  return `${(((total - failed) / total) * 100).toFixed(1)} %`;
 }
 
 export function Dashboard() {
@@ -52,6 +70,7 @@ export function Dashboard() {
   const [status, setStatus] = useState<TransactionStatus | "">("");
   const [provider, setProvider] = useState<Provider | "">("");
 
+  const stats = useStats(apiKey);
   const list = useTransactions(apiKey, { status: status || undefined, provider: provider || undefined });
 
   const rows = list.data?.pages.flatMap((p) => p.data) ?? [];
@@ -61,7 +80,9 @@ export function Dashboard() {
         <div>
           <h1 className="text-2xl font-semibold">ledger-ops — démonstration</h1>
           <p className="text-sm text-muted-foreground">
-            Jeu de démonstration : date de chargement indisponible
+            {stats.data?.demoDatasetLoadedAt
+              ? `Jeu de démonstration chargé le ${formatDateTime(stats.data.demoDatasetLoadedAt)}`
+              : "Jeu de démonstration : date de chargement indisponible"}
           </p>
         </div>
         <ApiKeyPanel />
@@ -75,10 +96,37 @@ export function Dashboard() {
       ) : (
         <>
           <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {["Volume", "Taux de réussite", "Taux de rapprochement", "Exceptions ouvertes"].map((title) => (
-              <Kpi key={title} title={title} value="Indisponible" hint="En attente de l'endpoint /v1/stats." />
-            ))}
+            <Kpi
+              title="Volume"
+              loading={stats.isLoading}
+              value={stats.data ? `${stats.data.totalTransactions} transactions` : "Indisponible"}
+              hint={stats.data?.scope === "MERCHANT" ? "Votre marchand uniquement." : "Toute la plateforme."}
+            />
+            <Kpi
+              title="Taux de réussite"
+              loading={stats.isLoading}
+              value={stats.data ? successRate(stats.data.payments.byStatus) : "Indisponible"}
+              hint="Paiements dénoués non échoués ni expirés (hors en cours)."
+            />
+            <Kpi
+              title="Taux de rapprochement"
+              value="Indisponible"
+              hint="L'API ne fournit pas ce taux."
+            />
+            <Kpi
+              title="Exceptions ouvertes"
+              loading={stats.isLoading}
+              value={
+                stats.data
+                  ? stats.data.openReconciliationExceptions === null
+                    ? "Réservé"
+                    : String(stats.data.openReconciliationExceptions)
+                  : "Indisponible"
+              }
+              hint={stats.data?.openReconciliationExceptions === null ? "Rôle ANALYST, OPERATOR ou ADMIN requis." : undefined}
+            />
           </section>
+          {stats.isError && <ErrorNotice error={stats.error} what="les indicateurs" />}
 
           <Card>
             <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
