@@ -11,7 +11,7 @@ const LINKS = [
   { href: "/reconciliation", label: "Rapprochement" },
 ];
 
-const linkClass = "rounded-md px-2.5 py-1 text-sm hover:bg-muted";
+const linkClass = "whitespace-nowrap rounded-md px-2.5 py-1 text-sm hover:bg-muted";
 
 function MainNav() {
   const pathname = usePathname();
@@ -54,7 +54,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="border-b">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-3">
           <div className="flex items-center gap-6">
-            <span className="font-semibold">ledger-ops</span>
+            <span className="whitespace-nowrap font-semibold">ledger-ops</span>
             <Suspense fallback={<MainNavFallback />}>
               <MainNav />
             </Suspense>

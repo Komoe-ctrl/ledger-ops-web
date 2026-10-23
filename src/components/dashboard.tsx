@@ -164,11 +164,11 @@ export function Dashboard() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Référence</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Opérateur</TableHead>
+                      <TableHead className="hidden md:table-cell">Type</TableHead>
+                      <TableHead className="hidden md:table-cell">Opérateur</TableHead>
                       <TableHead>Statut</TableHead>
-                      <TableHead className="text-right">Montant</TableHead>
-                      <TableHead>Créée le</TableHead>
+                      <TableHead className="hidden text-right md:table-cell">Montant</TableHead>
+                      <TableHead className="hidden md:table-cell">Créée le</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -195,14 +195,20 @@ export function Dashboard() {
                           >
                             {t.reference}
                           </Link>
+                          {/* Mobile : type et opérateur passent sous la référence, leurs colonnes sont masquées. */}
+                          <p className="font-sans text-xs text-muted-foreground md:hidden">
+                            {t.type === "PAYMENT" ? "Paiement" : "Remboursement"} · {PROVIDER_LABELS[t.provider]}
+                          </p>
                         </TableCell>
-                        <TableCell>{t.type === "PAYMENT" ? "Paiement" : "Remboursement"}</TableCell>
-                        <TableCell>{PROVIDER_LABELS[t.provider]}</TableCell>
+                        <TableCell className="hidden md:table-cell">{t.type === "PAYMENT" ? "Paiement" : "Remboursement"}</TableCell>
+                        <TableCell className="hidden md:table-cell">{PROVIDER_LABELS[t.provider]}</TableCell>
                         <TableCell>
                           <StatusBadge status={t.status} />
+                          {/* Mobile : le montant passe sous le statut, sa colonne est masquée. */}
+                          <p className="mt-1 text-sm tabular-nums md:hidden">{formatAmount(t.amount, t.currency)}</p>
                         </TableCell>
-                        <TableCell className="text-right tabular-nums">{formatAmount(t.amount, t.currency)}</TableCell>
-                        <TableCell className="tabular-nums">{formatDateTime(t.createdAt)}</TableCell>
+                        <TableCell className="hidden text-right tabular-nums md:table-cell">{formatAmount(t.amount, t.currency)}</TableCell>
+                        <TableCell className="hidden tabular-nums md:table-cell">{formatDateTime(t.createdAt)}</TableCell>
                       </TableRow>
                     ))}
                     {list.isSuccess && rows.length === 0 && (

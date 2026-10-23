@@ -72,7 +72,7 @@ function BalanceStrip({ entry, currency }: { entry: Entry; currency: string }) {
   const side = (label: string, amount: string, tint: string, align: "start" | "end") => (
     <div className={cn("flex flex-col justify-center rounded-lg px-4 py-3", tint, align === "end" ? "items-end text-right" : "items-start")}>
       <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
-      <span className="text-2xl font-semibold tabular-nums">{formatAmount(amount, currency)}</span>
+      <span className="text-xl font-semibold tabular-nums sm:text-2xl">{formatAmount(amount, currency)}</span>
     </div>
   );
 
@@ -81,12 +81,12 @@ function BalanceStrip({ entry, currency }: { entry: Entry; currency: string }) {
       role="group"
       aria-label={ok ? "Écriture équilibrée : débits égaux aux crédits" : "Écriture déséquilibrée : débits différents des crédits"}
       className={cn(
-        "grid grid-cols-[1fr_auto_1fr] items-stretch gap-3 rounded-xl border-2 p-3",
+        "grid grid-cols-1 items-stretch gap-2 rounded-xl border-2 p-3 sm:grid-cols-[1fr_auto_1fr] sm:gap-3",
         ok ? "border-emerald-500/70" : "border-red-500 bg-red-50 dark:bg-red-950/30",
       )}
     >
       {side("Total des débits", entry.totalDebit, DEBIT_TINT, "start")}
-      <div className="flex min-w-24 flex-col items-center justify-center">
+      <div className="flex min-w-24 flex-row items-center justify-center gap-2 sm:flex-col sm:gap-0">
         <span
           className={cn(
             "flex size-11 items-center justify-center rounded-full text-3xl font-light leading-none text-white",
@@ -96,7 +96,7 @@ function BalanceStrip({ entry, currency }: { entry: Entry; currency: string }) {
         >
           {ok ? "=" : "≠"}
         </span>
-        <span className={cn("mt-1 text-xs font-semibold", ok ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400")}>
+        <span className={cn("text-xs font-semibold sm:mt-1", ok ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400")}>
           {ok ? "Équilibrée" : "Déséquilibrée"}
         </span>
       </div>
@@ -247,20 +247,21 @@ function AuditContent({ audit, reference }: { audit: Audit; reference: string })
                     <TableHeader>
                       <TableRow>
                         <TableHead>Compte</TableHead>
-                        <TableHead className={cn("w-48 text-right", DEBIT_TINT)}>Débit</TableHead>
-                        <TableHead className={cn("w-48 text-right", CREDIT_TINT)}>Crédit</TableHead>
+                        <TableHead className={cn("w-24 px-1 text-right sm:w-48 sm:px-2", DEBIT_TINT)}>Débit</TableHead>
+                        <TableHead className={cn("w-24 px-1 text-right sm:w-48 sm:px-2", CREDIT_TINT)}>Crédit</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {entry.postings.map((p, i) => (
                         <TableRow key={i}>
-                          <TableCell>
-                            {p.accountName} <span className="font-mono text-xs text-muted-foreground">{p.accountCode}</span>
+                          <TableCell className="whitespace-normal">
+                            {p.accountName}{" "}
+                            <span className="block break-all font-mono text-xs text-muted-foreground sm:inline">{p.accountCode}</span>
                           </TableCell>
-                          <TableCell className={cn("text-right tabular-nums", DEBIT_TINT)}>
+                          <TableCell className={cn("px-1 text-right tabular-nums sm:px-2", DEBIT_TINT)}>
                             {p.direction === "DEBIT" ? formatAmount(p.amount, p.currency) : ""}
                           </TableCell>
-                          <TableCell className={cn("text-right tabular-nums", CREDIT_TINT)}>
+                          <TableCell className={cn("px-1 text-right tabular-nums sm:px-2", CREDIT_TINT)}>
                             {p.direction === "CREDIT" ? formatAmount(p.amount, p.currency) : ""}
                           </TableCell>
                         </TableRow>
@@ -269,10 +270,10 @@ function AuditContent({ audit, reference }: { audit: Audit; reference: string })
                     <TableFooter>
                       <TableRow>
                         <TableCell className="font-semibold">Totaux</TableCell>
-                        <TableCell className={cn("text-right font-semibold tabular-nums", DEBIT_TINT)}>
+                        <TableCell className={cn("px-1 text-right font-semibold tabular-nums sm:px-2", DEBIT_TINT)}>
                           {formatAmount(entry.totalDebit, entryCurrency)}
                         </TableCell>
-                        <TableCell className={cn("text-right font-semibold tabular-nums", CREDIT_TINT)}>
+                        <TableCell className={cn("px-1 text-right font-semibold tabular-nums sm:px-2", CREDIT_TINT)}>
                           {formatAmount(entry.totalCredit, entryCurrency)}
                         </TableCell>
                       </TableRow>
