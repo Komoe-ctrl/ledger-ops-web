@@ -65,6 +65,11 @@ function successRate(byStatus: { status: string; count: number }[]): string {
   return `${(((total - failed) / total) * 100).toFixed(1)} %`;
 }
 
+function reconciliationRate(rec: { settledTransactions: number; reconciledTransactions: number }): string {
+  if (rec.settledTransactions === 0) return "—";
+  return `${((rec.reconciledTransactions / rec.settledTransactions) * 100).toFixed(1)} %`;
+}
+
 export function Dashboard() {
   const apiKey = useApiKey();
   const [status, setStatus] = useState<TransactionStatus | "">("");
@@ -110,8 +115,15 @@ export function Dashboard() {
             />
             <Kpi
               title="Taux de rapprochement"
-              value="Indisponible"
-              hint="L'API ne fournit pas ce taux."
+              loading={stats.isLoading}
+              value={stats.data?.reconciliation ? reconciliationRate(stats.data.reconciliation) : "Indisponible"}
+              hint={
+                stats.data?.reconciliation
+                  ? `${stats.data.reconciliation.reconciledTransactions} rapprochées sur ${stats.data.reconciliation.settledTransactions} dénouées (jeu de démonstration).`
+                  : stats.data?.scope === "MERCHANT"
+                    ? "Réservé aux rôles ANALYST, OPERATOR et ADMIN."
+                    : "Aucun chargement du jeu de démonstration enregistré."
+              }
             />
             <Kpi
               title="Exceptions ouvertes"
